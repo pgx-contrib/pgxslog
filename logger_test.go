@@ -1,13 +1,7 @@
-# pgxslog
-
-A log/slog adapter for pgx
-
-## Getting Started
-
-```golang
-package main
+package pgxslog_test
 
 import (
+	"context"
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,7 +9,9 @@ import (
 	"github.com/pgx-contrib/pgxslog"
 )
 
-func main() {
+var count int
+
+func ExampleLogger() {
 	config, err := pgxpool.ParseConfig(os.Getenv("PGX_DATABASE_URL"))
 	if err != nil {
 		panic(err)
@@ -36,4 +32,3 @@ func main() {
 		panic(err)
 	}
 }
-```
