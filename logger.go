@@ -52,7 +52,7 @@ func (x *Logger) Log(ctx context.Context, level tracelog.LogLevel, msg string, d
 
 		if value, ok := v.(string); k == "sql" && ok {
 			if match := pattern.FindStringSubmatch(value); len(match) == 2 {
-				record.AddAttrs(slog.Any("sql_name", match[1]))
+				record.AddAttrs(slog.Any("sql_operation", match[1]))
 			}
 		}
 	}
