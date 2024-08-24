@@ -6,4 +6,4 @@ A log/slog adapter for pgx
 
 ## Getting Started
 
-You can use this [example](./logger_test.go) to get started.
+You can use these [examples](https://pkg.go.dev/github.com/pgx-contrib/pgxslog#pkg-examples) to get started.
