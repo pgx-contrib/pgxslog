@@ -3,6 +3,7 @@ package pgxslog
 import (
 	"context"
 	"log/slog"
+	"reflect"
 	"regexp"
 	"runtime"
 	"time"
@@ -48,13 +49,37 @@ func (x *Logger) Log(ctx context.Context, level tracelog.LogLevel, msg string, d
 
 	// add the attributes
 	for k, v := range data {
-		record.AddAttrs(slog.Any(k, v))
+		switch k {
+		case "sql":
+			if value, ok := v.(string); ok {
+				if match := pattern.FindStringSubmatch(value); len(match) == 2 {
+					record.AddAttrs(slog.Any("sql_operation", match[1]))
+				}
+			}
+		case "args":
+			if args, ok := v.([]any); ok {
+				var vc []any
 
-		if value, ok := v.(string); k == "sql" && ok {
-			if match := pattern.FindStringSubmatch(value); len(match) == 2 {
-				record.AddAttrs(slog.Any("sql_operation", match[1]))
+				for _, value := range args {
+					// reflect the parameter
+					vref := reflect.ValueOf(value)
+					vref = reflect.Indirect(vref)
+					// prepare the collection
+					switch {
+					case !vref.IsValid():
+						vc = append(vc, value)
+					case !vref.CanInterface():
+						vc = append(vc, value)
+					default:
+						vc = append(vc, vref.Interface())
+					}
+				}
+				// override the value
+				v = vc
 			}
 		}
+
+		record.AddAttrs(slog.Any(k, v))
 	}
 
 	logger := FromContext(ctx)
