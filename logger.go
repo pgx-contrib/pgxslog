@@ -2,13 +2,13 @@ package pgxslog
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"log/slog"
 	"reflect"
 	"regexp"
 	"runtime"
 	"strings"
+	"unicode"
 
 	"github.com/jackc/pgx/v5/tracelog"
 )
@@ -20,8 +20,8 @@ var _ tracelog.Logger = (*Logger)(nil)
 
 // Logger is a tracelog.Logger that logs to the given logger.
 type Logger struct {
-	// FromContext is a function that returns the logger from the context.
-	FromContext func(ctx context.Context) *slog.Logger
+	// GetLogger is a function that returns the logger from the context.
+	GetLogger func(ctx context.Context) *slog.Logger
 }
 
 // Log implements tracelog.Logger.
@@ -38,21 +38,12 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 		runtime.Callers(4, pcs[:])
 	}
 
-	var attrs []slog.Attr
 	// map the level
-	level := slog.LevelDebug - slog.Level(severity)
-
-	// prepare the record
-	switch severity {
-	case tracelog.LogLevelDebug:
-		level = slog.LevelDebug
-	case tracelog.LogLevelInfo:
-		level = slog.LevelInfo
-	case tracelog.LogLevelWarn:
-		level = slog.LevelWarn
-	case tracelog.LogLevelError:
-		level = slog.LevelError
-	default:
+	level := ConvertSeverity(severity)
+	// prepare the attributes
+	var attrs []slog.Attr
+	// add the severity if it's not mapped
+	if level < slog.LevelDebug {
 		attrs = append(attrs, slog.Any("PGX_LOG_LEVEL", severity))
 	}
 
@@ -62,35 +53,20 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 		case "sql":
 			if value, ok := v.(string); ok {
 				if match := NameRegexp.FindStringSubmatch(value); len(match) == 2 {
-					attrs = append(attrs, slog.Any("sql_operation", match[1]))
+					attrs = append(attrs, slog.Any("command_name", match[1]))
 				}
+
 				// overwrite the value
 				v = TrimQuery(value)
 			}
 		case "args":
 			if args, ok := v.([]any); ok {
-				var vc []any
-
-				for _, value := range args {
-					// reflect the parameter
-					vref := reflect.ValueOf(value)
-					vref = reflect.Indirect(vref)
-					// prepare the collection
-					switch {
-					case !vref.IsValid():
-						vc = append(vc, value)
-					case !vref.CanInterface():
-						vc = append(vc, value)
-					default:
-						vc = append(vc, vref.Interface())
-					}
-				}
 				// override the value
-				v = vc
+				v = ConvertArgs(args)
 			}
 		}
 
-		attrs = append(attrs, slog.Any(k, v))
+		attrs = append(attrs, ConvertAttr(k, v))
 	}
 
 	attr := slog.Attr{
@@ -103,28 +79,107 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 }
 
 func (x *Logger) logger(ctx context.Context) *slog.Logger {
-	if x.FromContext != nil {
-		return x.FromContext(ctx)
+	if x.GetLogger != nil {
+		return x.GetLogger(ctx)
 	}
 
 	return FromContext(ctx)
 }
 
+// ConvertSeverity converts the severity to a slog.Level.
+func ConvertSeverity(severity tracelog.LogLevel) slog.Level {
+	level := slog.LevelDebug - slog.Level(severity)
+
+	// prepare the record
+	switch severity {
+	case tracelog.LogLevelDebug:
+		level = slog.LevelDebug
+	case tracelog.LogLevelInfo:
+		level = slog.LevelInfo
+	case tracelog.LogLevelWarn:
+		level = slog.LevelWarn
+	case tracelog.LogLevelError:
+		level = slog.LevelError
+	}
+
+	return level
+}
+
+// ConvertArgs converts the arguments to a collection of interfaces.
+func ConvertArgs(args []any) []any {
+	var vc []any
+
+	for _, value := range args {
+		// reflect the parameter
+		vref := reflect.ValueOf(value)
+		vref = reflect.Indirect(vref)
+		// prepare the collection
+		switch {
+		case !vref.IsValid():
+			vc = append(vc, value)
+		case !vref.CanInterface():
+			vc = append(vc, value)
+		default:
+			vc = append(vc, vref.Interface())
+		}
+	}
+
+	return vc
+}
+
+// ConvertAttr converts the key and value to an attribute.
+func ConvertAttr(key string, value any) slog.Attr {
+	reader := strings.NewReader(key)
+	scanner := bufio.NewScanner(reader)
+	scanner.Split(bufio.ScanRunes)
+
+	builder := &strings.Builder{}
+	// scan the query and fill the builder
+	for scanner.Scan() {
+		for _, ch := range scanner.Text() {
+			if unicode.IsSpace(ch) {
+				if builder.Len() > 0 {
+					builder.WriteString("_")
+				}
+				continue
+			}
+
+			if unicode.IsUpper(ch) {
+				if builder.Len() > 0 {
+					builder.WriteString("_")
+				}
+			}
+
+			ch = unicode.ToLower(ch)
+			// write the character
+			builder.WriteRune(ch)
+		}
+	}
+
+	key = builder.String()
+	// create teh attribute
+	return slog.Any(key, value)
+}
+
 // TrimQuery trims the query by removing the comments.
 func TrimQuery(query string) string {
-	writer := &bytes.Buffer{}
 	reader := strings.NewReader(query)
 	scanner := bufio.NewScanner(reader)
 
+	builder := &strings.Builder{}
+	// scan the query and fill the builder
 	for scanner.Scan() {
 		text := scanner.Text()
 		text = strings.TrimSpace(text)
 		if strings.HasPrefix(text, "--") {
 			continue
 		}
-		writer.WriteString(text)
-		writer.WriteString("\n")
+
+		if builder.Len() > 0 {
+			builder.WriteString(" ")
+		}
+		builder.WriteString(text)
 	}
 
-	return writer.String()
+	return builder.String()
 }
