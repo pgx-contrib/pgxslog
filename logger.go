@@ -53,7 +53,7 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 		case "sql":
 			if value, ok := v.(string); ok {
 				if match := NameRegexp.FindStringSubmatch(value); len(match) == 2 {
-					attrs = append(attrs, slog.Any("command_name", match[1]))
+					attrs = append(attrs, slog.Any("sql_operation", match[1]))
 				}
 
 				// overwrite the value
