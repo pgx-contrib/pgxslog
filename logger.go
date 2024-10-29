@@ -171,13 +171,23 @@ func TrimQuery(query string) string {
 	for scanner.Scan() {
 		text := scanner.Text()
 		text = strings.TrimSpace(text)
-		if strings.HasPrefix(text, "--") {
+
+		index := strings.Index(text, "--")
+
+		if index == 0 {
 			continue
 		}
+
+		if index > 0 {
+			text = text[:index]
+		}
+
+		text = strings.TrimSpace(text)
 
 		if builder.Len() > 0 {
 			builder.WriteString(" ")
 		}
+
 		builder.WriteString(text)
 	}
 
