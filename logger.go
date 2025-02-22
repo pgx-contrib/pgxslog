@@ -20,8 +20,8 @@ var _ tracelog.Logger = (*Logger)(nil)
 
 // Logger is a tracelog.Logger that logs to the given logger.
 type Logger struct {
-	// GetLogger is a function that returns the logger from the context.
-	GetLogger func(ctx context.Context) *slog.Logger
+	// Key is the context key of the logger.
+	Key any
 }
 
 // Log implements tracelog.Logger.
@@ -53,7 +53,7 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 		case "sql":
 			if value, ok := v.(string); ok {
 				if match := NameRegexp.FindStringSubmatch(value); len(match) == 2 {
-					attrs = append(attrs, slog.Any("sql_operation", match[1]))
+					attrs = append(attrs, slog.Any("name", match[1]))
 				}
 
 				// overwrite the value
@@ -70,7 +70,7 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 	}
 
 	attr := slog.Attr{
-		Key:   "pgx",
+		Key:   "query",
 		Value: slog.GroupValue(attrs...),
 	}
 
@@ -79,11 +79,13 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 }
 
 func (x *Logger) logger(ctx context.Context) *slog.Logger {
-	if x.GetLogger != nil {
-		return x.GetLogger(ctx)
+	if key := x.Key; key == nil {
+		if logger, ok := ctx.Value(key).(*slog.Logger); ok {
+			return logger
+		}
 	}
 
-	return FromContext(ctx)
+	return slog.Default()
 }
 
 // ConvertSeverity converts the severity to a slog.Level.
