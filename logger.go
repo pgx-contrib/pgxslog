@@ -20,8 +20,8 @@ var _ tracelog.Logger = (*Logger)(nil)
 
 // Logger is a tracelog.Logger that logs to the given logger.
 type Logger struct {
-	// Key is the context key of the logger.
-	Key any
+	// ContextKey is the context key of the logger.
+	ContextKey any
 }
 
 // Log implements tracelog.Logger.
@@ -79,7 +79,7 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 }
 
 func (x *Logger) logger(ctx context.Context) *slog.Logger {
-	if key := x.Key; key == nil {
+	if key := x.ContextKey; key == nil {
 		if logger, ok := ctx.Value(key).(*slog.Logger); ok {
 			return logger
 		}
