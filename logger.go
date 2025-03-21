@@ -195,3 +195,18 @@ func TrimQuery(query string) string {
 
 	return builder.String()
 }
+
+// ContextKey represents a context key.
+type ContextKey struct {
+	name string
+}
+
+// String returns the context key as a string.
+func (k *ContextKey) String() string {
+	return k.name
+}
+
+// LoggerKey represents the context key of the logger.
+var LoggerKey = &ContextKey{
+	name: reflect.TypeOf(ContextKey{}).PkgPath() + "Logger",
+}
