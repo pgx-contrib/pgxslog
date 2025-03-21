@@ -55,9 +55,6 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 				if match := NameRegexp.FindStringSubmatch(value); len(match) == 2 {
 					attrs = append(attrs, slog.Any("name", match[1]))
 				}
-
-				// overwrite the value
-				v = TrimQuery(value)
 			}
 		case "args":
 			if args, ok := v.([]any); ok {
@@ -161,39 +158,6 @@ func ConvertAttr(key string, value any) slog.Attr {
 	key = builder.String()
 	// create teh attribute
 	return slog.Any(key, value)
-}
-
-// TrimQuery trims the query by removing the comments.
-func TrimQuery(query string) string {
-	reader := strings.NewReader(query)
-	scanner := bufio.NewScanner(reader)
-
-	builder := &strings.Builder{}
-	// scan the query and fill the builder
-	for scanner.Scan() {
-		text := scanner.Text()
-		text = strings.TrimSpace(text)
-
-		index := strings.Index(text, "--")
-
-		if index == 0 {
-			continue
-		}
-
-		if index > 0 {
-			text = text[:index]
-		}
-
-		text = strings.TrimSpace(text)
-
-		if builder.Len() > 0 {
-			builder.WriteString(" ")
-		}
-
-		builder.WriteString(text)
-	}
-
-	return builder.String()
 }
 
 // ContextKey represents a context key.
