@@ -76,7 +76,7 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 }
 
 func (x *Logger) logger(ctx context.Context) *slog.Logger {
-	if key := x.ContextKey; key == nil {
+	if key := x.ContextKey; key != nil {
 		if logger, ok := ctx.Value(key).(*slog.Logger); ok {
 			return logger
 		}
