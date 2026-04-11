@@ -1,7 +1,6 @@
 package pgxslog
 
 import (
-	"bufio"
 	"context"
 	"log/slog"
 	"reflect"
@@ -136,36 +135,36 @@ func ConvertArgs(args []any) []any {
 
 // ConvertAttr converts the key and value to an attribute.
 func ConvertAttr(key string, value any) slog.Attr {
-	reader := strings.NewReader(key)
-	scanner := bufio.NewScanner(reader)
-	scanner.Split(bufio.ScanRunes)
-
+	runes := []rune(key)
 	builder := &strings.Builder{}
-	// scan the query and fill the builder
-	for scanner.Scan() {
-		for _, ch := range scanner.Text() {
-			if unicode.IsSpace(ch) {
-				if builder.Len() > 0 {
-					builder.WriteString("_")
-				}
-				continue
-			}
 
-			if unicode.IsUpper(ch) {
-				if builder.Len() > 0 {
-					builder.WriteString("_")
-				}
+	for i, ch := range runes {
+		if unicode.IsSpace(ch) {
+			if builder.Len() > 0 {
+				builder.WriteRune('_')
 			}
-
-			ch = unicode.ToLower(ch)
-			// write the character
-			builder.WriteRune(ch)
+			continue
 		}
+
+		if unicode.IsUpper(ch) && builder.Len() > 0 {
+			prev := runes[i-1]
+			var next rune
+			if i+1 < len(runes) {
+				next = runes[i+1]
+			}
+			// insert underscore when transitioning from lower→upper,
+			// or at the end of an uppercase run before a lowercase letter
+			// (e.g. "SQLQuery" → "sql_query", not "s_q_l_query")
+			if unicode.IsLower(prev) || (unicode.IsUpper(prev) && unicode.IsLower(next)) {
+				builder.WriteRune('_')
+			}
+		}
+
+		builder.WriteRune(unicode.ToLower(ch))
 	}
 
-	key = builder.String()
 	// create the attribute
-	return slog.Any(key, value)
+	return slog.Any(builder.String(), value)
 }
 
 // ContextKey represents a context key.

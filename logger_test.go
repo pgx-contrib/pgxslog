@@ -126,6 +126,9 @@ var _ = Describe("pgxslog unit tests", func() {
 			Entry("PascalCase", "Time", "time"),
 			Entry("space separator", "row count", "row_count"),
 			Entry("multi-word", "BatchSize", "batch_size"),
+			Entry("all-caps acronym", "SQL", "sql"),
+			Entry("acronym prefix", "SQLQuery", "sql_query"),
+			Entry("acronym suffix", "querySQL", "query_sql"),
 		)
 	})
 
