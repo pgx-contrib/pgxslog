@@ -12,7 +12,12 @@ import (
 )
 
 func ExampleLogger() {
-	config, err := pgxpool.ParseConfig(os.Getenv("PGX_DATABASE_URL"))
+	url := os.Getenv("PGX_DATABASE_URL")
+	if url == "" {
+		return
+	}
+
+	config, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		panic(err)
 	}

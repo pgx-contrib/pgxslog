@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/jackc/pgx/v5/tracelog"
@@ -40,6 +41,12 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 
 	// map the level
 	level := ConvertSeverity(severity)
+
+	logger := x.logger(ctx)
+	if !logger.Enabled(ctx, level) {
+		return
+	}
+
 	// prepare the attributes
 	var attrs []slog.Attr
 	// add the severity if it's not mapped
@@ -71,8 +78,9 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 		Value: slog.GroupValue(attrs...),
 	}
 
-	logger := x.logger(ctx)
-	logger.LogAttrs(ctx, level, message, attr)
+	record := slog.NewRecord(time.Now(), level, message, pcs[0])
+	record.AddAttrs(attr)
+	_ = logger.Handler().Handle(ctx, record)
 }
 
 func (x *Logger) logger(ctx context.Context) *slog.Logger {
@@ -156,7 +164,7 @@ func ConvertAttr(key string, value any) slog.Attr {
 	}
 
 	key = builder.String()
-	// create teh attribute
+	// create the attribute
 	return slog.Any(key, value)
 }
 
