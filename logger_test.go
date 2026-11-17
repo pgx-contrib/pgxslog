@@ -244,6 +244,34 @@ var _ = Describe("pgxslog unit tests", func() {
 			Expect(argsAttr.Value.Any()).To(ContainElement(99))
 		})
 
+		It("omits args when the logger does not have debug enabled", func() {
+			handler := &disabledAtDebugHandler{}
+			slog.SetDefault(slog.New(handler))
+
+			logger.Log(context.Background(), tracelog.LogLevelError, "Query", map[string]any{
+				"sql":  "SELECT 1 WHERE email = $1",
+				"args": []any{"test@example.invalid"},
+				"err":  "boom",
+			})
+			Expect(handler.records).To(HaveLen(1))
+			group := findGroupAttr(handler.records[0], "query")
+			Expect(findAttrInGroup(group, "sql")).NotTo(BeNil())
+			Expect(findAttrInGroup(group, "err")).NotTo(BeNil())
+			Expect(findAttrInGroup(group, "args")).To(BeNil())
+		})
+
+		It("includes args when the logger has debug enabled", func() {
+			logger.Log(context.Background(), tracelog.LogLevelError, "Query", map[string]any{
+				"sql":  "SELECT 1 WHERE email = $1",
+				"args": []any{"test@example.invalid"},
+			})
+			Expect(handler.records).To(HaveLen(1))
+			group := findGroupAttr(handler.records[0], "query")
+			argsAttr := findAttrInGroup(group, "args")
+			Expect(argsAttr).NotTo(BeNil())
+			Expect(argsAttr.Value.Any()).To(ContainElement("test@example.invalid"))
+		})
+
 		It("adds PGX_LOG_LEVEL for LogLevelTrace (level < Debug)", func() {
 			logger.Log(context.Background(), tracelog.LogLevelTrace, "trace msg", nil)
 			Expect(handler.records).To(HaveLen(1))

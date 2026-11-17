@@ -63,6 +63,12 @@ func (x *Logger) Log(ctx context.Context, severity tracelog.LogLevel, message st
 				}
 			}
 		case "args":
+			// bound query arguments often carry sensitive data (identifiers,
+			// contact details), so they are only included when the target
+			// logger has debug enabled.
+			if !logger.Enabled(ctx, slog.LevelDebug) {
+				continue
+			}
 			if args, ok := v.([]any); ok {
 				// override the value
 				v = ConvertArgs(args)
