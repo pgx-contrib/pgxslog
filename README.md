@@ -56,6 +56,13 @@ config.ConnConfig.Tracer = &tracelog.TraceLog{
 }
 ```
 
+### Query arguments
+
+Bound query arguments (`args`) often carry sensitive data, so they are only
+included in the `query` group when the target logger has `slog.LevelDebug`
+enabled. At info and above the record still carries the SQL, the error and
+the timing, but not the values.
+
 ## Development
 
 ### DevContainer
